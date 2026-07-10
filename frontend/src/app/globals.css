@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/* Force light theme — the app was designed for it. Dark-mode restyle is
+   out of scope for the sprint. */
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  background: #fafafa;   /* neutral-50 */
+  color: #171717;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}

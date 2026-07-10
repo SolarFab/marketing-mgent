@@ -1,0 +1,226 @@
+{
+  "version": "v1",
+  "created": "2026-07-08",
+  "purpose": "Golden set for Evaluate-node precision/recall. 20 candidate items labelled feature/discard, split across both content mixes (owned + external) and both PRD archetypes (producer + startup).",
+  "labeller_note": "Labels reflect a competent marketer's judgement for the given company profile — 'feature' items are ones we would want to see in the newsletter this week; 'discard' items are ones the human would refuse.",
+  "profiles": {
+    "wine_estate": {
+      "identity": {"summary": "5th-generation Rheinhessen wine estate.", "products": ["Riesling 2023", "Pinot Noir", "cellar tours"]},
+      "market": {"segments": ["direct-to-consumer wine", "regional restaurants"], "geo": ["Rheinhessen, DE"], "icp": "wine enthusiasts and regional restaurateurs"},
+      "positioning": {"value_prop": "Steep-slope, organic, hand-picked.", "differentiators": ["organic", "5th-generation", "steep-slope"]},
+      "voice": {"tone": ["warm", "earthy", "unpretentious"], "vocabulary": ["vintage", "terroir", "hand-picked"], "do": ["tell the family story"], "dont": ["corporate jargon", "hype"]},
+      "content_pillars": {"product": "wine releases", "place": "vineyard & seasons", "people": "family & craft", "events": "tastings & tours"},
+      "content_mix": 0.8
+    },
+    "logistics_startup": {
+      "identity": {"summary": "Warehouse routing API for mid-size 3PLs.", "products": ["warehouse routing API", "fleet analytics"]},
+      "market": {"segments": ["mid-size 3PLs", "e-commerce fulfilment"], "geo": ["DACH", "EU"], "icp": "ops lead at a 50-500 person 3PL"},
+      "positioning": {"value_prop": "Route your warehouse without a forklift retrofit.", "differentiators": ["no forklift retrofit", "2-week integration"]},
+      "voice": {"tone": ["direct", "technical", "no-hype"], "vocabulary": ["pick rate", "throughput", "integration"], "do": ["show numbers"], "dont": ["buzzwords", "AI-will-change-everything takes"]},
+      "content_pillars": {"industry": "warehouse automation news", "proof": "customer results", "opinion": "where the market is going"},
+      "content_mix": 0.3
+    }
+  },
+  "items": [
+    {
+      "id": "g_wine_01",
+      "profile": "wine_estate",
+      "kind": "owned",
+      "title": "Harvest is starting — first Riesling grapes are in",
+      "angle": "Behind-the-scenes photos from day one of picking. Hand-carried baskets, family involvement.",
+      "pillar": "place",
+      "expected_route": "feature",
+      "expected_hint": "Own the moment: seasonal, on-brand, hand-picked shows differentiator."
+    },
+    {
+      "id": "g_wine_02",
+      "profile": "wine_estate",
+      "kind": "owned",
+      "title": "Meet the 5th-generation family behind the estate",
+      "angle": "Portrait interview with the father-daughter team.",
+      "pillar": "people",
+      "expected_route": "feature",
+      "expected_hint": "Family story is an explicit voice.do and a differentiator."
+    },
+    {
+      "id": "g_wine_03",
+      "profile": "wine_estate",
+      "kind": "owned",
+      "title": "Introducing the 2023 Riesling — order now",
+      "angle": "Hard sell on the vintage: hype, urgency, buy links.",
+      "pillar": "product",
+      "expected_route": "discard",
+      "expected_hint": "Voice.dont says no hype. Purely promotional."
+    },
+    {
+      "id": "g_wine_04",
+      "profile": "wine_estate",
+      "kind": "external",
+      "title": "German wine exports up 3% year-on-year — Wine Trade Monthly",
+      "angle": "What the export tick means for a small Rheinhessen estate: not much, but nice to know.",
+      "pillar": "industry",
+      "expected_route": "uncertain",
+      "expected_hint": "Adjacent industry, but a small DTC producer's audience doesn't care."
+    },
+    {
+      "id": "g_wine_05",
+      "profile": "wine_estate",
+      "kind": "external",
+      "title": "Crypto winter deepens as Coinbase reports losses",
+      "angle": "Coinbase.",
+      "pillar": "industry",
+      "expected_route": "discard",
+      "expected_hint": "Zero relevance."
+    },
+    {
+      "id": "g_wine_06",
+      "profile": "wine_estate",
+      "kind": "owned",
+      "title": "Autumn tastings — book your Saturday in October",
+      "angle": "Event promotion for the tastings pillar.",
+      "pillar": "events",
+      "expected_route": "feature",
+      "expected_hint": "Events pillar exists; seasonal timing."
+    },
+    {
+      "id": "g_wine_07",
+      "profile": "wine_estate",
+      "kind": "external",
+      "title": "How steep-slope viticulture is disappearing across Europe",
+      "angle": "Article on the decline of steep-slope viticulture — the estate is one of the few holdouts.",
+      "pillar": "industry",
+      "expected_route": "feature",
+      "expected_hint": "Directly reinforces a differentiator and gives them a story to tell."
+    },
+    {
+      "id": "g_wine_08",
+      "profile": "wine_estate",
+      "kind": "owned",
+      "title": "10% off with code HARVEST — limited time",
+      "angle": "Discount promo.",
+      "pillar": "product",
+      "expected_route": "discard",
+      "expected_hint": "Voice is unpretentious, not promotional. Discount codes are off-brand."
+    },
+    {
+      "id": "g_wine_09",
+      "profile": "wine_estate",
+      "kind": "external",
+      "title": "Rheinhessen wines find new fans in Berlin's natural-wine scene",
+      "angle": "Regional shoutout — the estate could ride this trend.",
+      "pillar": "industry",
+      "expected_route": "feature",
+      "expected_hint": "Geo-relevant, ICP-relevant, on-brand tone."
+    },
+    {
+      "id": "g_wine_10",
+      "profile": "wine_estate",
+      "kind": "owned",
+      "title": "Cellar temperature dropped 2°C overnight — a quick word on why",
+      "angle": "Craft explainer — how temperature discipline shapes vintage character.",
+      "pillar": "people",
+      "expected_route": "feature",
+      "expected_hint": "Craft + terroir + educational; hits the pillar and voice."
+    },
+    {
+      "id": "g_logistics_01",
+      "profile": "logistics_startup",
+      "kind": "external",
+      "title": "DHL warehouse pilot cuts pick times 30%",
+      "angle": "Article on DHL's warehouse robotics pilot — what it means for mid-size 3PLs that can't afford the same capex.",
+      "pillar": "industry",
+      "expected_route": "feature",
+      "expected_hint": "Numbers, ICP, industry pillar, direct positioning connect."
+    },
+    {
+      "id": "g_logistics_02",
+      "profile": "logistics_startup",
+      "kind": "external",
+      "title": "Amazon opens 4 new fulfilment centres in Poland",
+      "angle": "How does Poland fit into DACH 3PL positioning? Poland pressure on cross-border 3PLs.",
+      "pillar": "industry",
+      "expected_route": "feature",
+      "expected_hint": "Geo overlap (EU/DACH), competitive angle."
+    },
+    {
+      "id": "g_logistics_03",
+      "profile": "logistics_startup",
+      "kind": "owned",
+      "title": "3 questions we get from every 50-person 3PL — and how we answer them",
+      "angle": "Proof pillar: real conversations, real answers, minimal AI-buzz.",
+      "pillar": "proof",
+      "expected_route": "feature",
+      "expected_hint": "ICP-specific, proof pillar, no-hype voice."
+    },
+    {
+      "id": "g_logistics_04",
+      "profile": "logistics_startup",
+      "kind": "external",
+      "title": "AI is going to change everything about logistics — thought piece",
+      "angle": "AI will transform logistics.",
+      "pillar": "opinion",
+      "expected_route": "discard",
+      "expected_hint": "Voice.dont: 'AI-will-change-everything takes' is called out explicitly."
+    },
+    {
+      "id": "g_logistics_05",
+      "profile": "logistics_startup",
+      "kind": "external",
+      "title": "New AWS EC2 instance types announced",
+      "angle": "AWS news.",
+      "pillar": "industry",
+      "expected_route": "discard",
+      "expected_hint": "Not warehouse ops. Off-topic."
+    },
+    {
+      "id": "g_logistics_06",
+      "profile": "logistics_startup",
+      "kind": "owned",
+      "title": "Our founder's routine for onboarding a 3PL in 2 weeks",
+      "angle": "Behind-the-scenes on the integration promise (differentiator).",
+      "pillar": "proof",
+      "expected_route": "feature",
+      "expected_hint": "Ties directly to differentiator '2-week integration'."
+    },
+    {
+      "id": "g_logistics_07",
+      "profile": "logistics_startup",
+      "kind": "external",
+      "title": "Pick rate benchmarks across mid-size warehouses — new industry report",
+      "angle": "Concrete numbers on pick rate — perfect for a business whose vocabulary includes 'pick rate'.",
+      "pillar": "industry",
+      "expected_route": "feature",
+      "expected_hint": "Directly on vocabulary and ICP; show numbers."
+    },
+    {
+      "id": "g_logistics_08",
+      "profile": "logistics_startup",
+      "kind": "owned",
+      "title": "Our exciting new AI-powered warehouse platform of the future",
+      "angle": "Hype-laden marketing copy.",
+      "pillar": "opinion",
+      "expected_route": "discard",
+      "expected_hint": "Voice.dont: buzzwords + 'AI-will-change-everything'. This is exactly what to reject."
+    },
+    {
+      "id": "g_logistics_09",
+      "profile": "logistics_startup",
+      "kind": "external",
+      "title": "Post-Brexit customs headaches force UK 3PLs to rethink EU strategy",
+      "angle": "How EU-only 3PL setups (DACH ICP) can win from UK 3PL pain.",
+      "pillar": "opinion",
+      "expected_route": "uncertain",
+      "expected_hint": "Adjacent, geo-relevant, but requires a strong angle to justify featuring."
+    },
+    {
+      "id": "g_logistics_10",
+      "profile": "logistics_startup",
+      "kind": "owned",
+      "title": "Customer story: A 200-person 3PL went from 60% to 82% pick accuracy in 6 weeks",
+      "angle": "Direct customer result. Numbers-first. Voice-matched.",
+      "pillar": "proof",
+      "expected_route": "feature",
+      "expected_hint": "Numbers, ICP, differentiator (integration speed), proof pillar."
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+.env
+.env.local
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+.next/
+out/
+frontend/.env.local
+frontend/.env
+*.db
+*.sqlite
+.DS_Store
+.claude/
+
+# Runtime artifacts
+data/brand-refs/*.png
+data/brand-refs/*.jpg
+frontend/.next/
+frontend/out/
+frontend/tsconfig.tsbuildinfo
+frontend/next-env.d.ts
+
+# IDE
+.idea/
+.vscode/

@@ -1,0 +1,163 @@
+{
+  "generated_at": "2026-07-08T11:58:05.233205+00:00",
+  "sections": {
+    "routing": {
+      "total": 20,
+      "true_positive": 3,
+      "false_positive": 0,
+      "false_negative": 9,
+      "true_negative": 8,
+      "precision": 1.0,
+      "recall": 0.25,
+      "f1": 0.4,
+      "per_item": [
+        {
+          "id": "g_wine_01",
+          "expected": "feature",
+          "predicted": "uncertain",
+          "score": 0.545,
+          "matches": false
+        },
+        {
+          "id": "g_wine_02",
+          "expected": "feature",
+          "predicted": "uncertain",
+          "score": 0.475,
+          "matches": false
+        },
+        {
+          "id": "g_wine_03",
+          "expected": "discard",
+          "predicted": "uncertain",
+          "score": 0.6149999999999999,
+          "matches": false
+        },
+        {
+          "id": "g_wine_04",
+          "expected": "uncertain",
+          "predicted": "uncertain",
+          "score": 0.525,
+          "matches": true
+        },
+        {
+          "id": "g_wine_05",
+          "expected": "discard",
+          "predicted": "discard",
+          "score": 0.385,
+          "matches": true
+        },
+        {
+          "id": "g_wine_06",
+          "expected": "feature",
+          "predicted": "uncertain",
+          "score": 0.475,
+          "matches": false
+        },
+        {
+          "id": "g_wine_07",
+          "expected": "feature",
+          "predicted": "discard",
+          "score": 0.385,
+          "matches": false
+        },
+        {
+          "id": "g_wine_08",
+          "expected": "discard",
+          "predicted": "uncertain",
+          "score": 0.475,
+          "matches": false
+        },
+        {
+          "id": "g_wine_09",
+          "expected": "feature",
+          "predicted": "uncertain",
+          "score": 0.525,
+          "matches": false
+        },
+        {
+          "id": "g_wine_10",
+          "expected": "feature",
+          "predicted": "uncertain",
+          "score": 0.6149999999999999,
+          "matches": false
+        },
+        {
+          "id": "g_logistics_01",
+          "expected": "feature",
+          "predicted": "feature",
+          "score": 0.7549999999999999,
+          "matches": true
+        },
+        {
+          "id": "g_logistics_02",
+          "expected": "feature",
+          "predicted": "feature",
+          "score": 0.6849999999999999,
+          "matches": true
+        },
+        {
+          "id": "g_logistics_03",
+          "expected": "feature",
+          "predicted": "uncertain",
+          "score": 0.545,
+          "matches": false
+        },
+        {
+          "id": "g_logistics_04",
+          "expected": "discard",
+          "predicted": "uncertain",
+          "score": 0.475,
+          "matches": false
+        },
+        {
+          "id": "g_logistics_05",
+          "expected": "discard",
+          "predicted": "uncertain",
+          "score": 0.475,
+          "matches": false
+        },
+        {
+          "id": "g_logistics_06",
+          "expected": "feature",
+          "predicted": "uncertain",
+          "score": 0.545,
+          "matches": false
+        },
+        {
+          "id": "g_logistics_07",
+          "expected": "feature",
+          "predicted": "feature",
+          "score": 0.6849999999999999,
+          "matches": true
+        },
+        {
+          "id": "g_logistics_08",
+          "expected": "discard",
+          "predicted": "uncertain",
+          "score": 0.545,
+          "matches": false
+        },
+        {
+          "id": "g_logistics_09",
+          "expected": "uncertain",
+          "predicted": "uncertain",
+          "score": 0.6149999999999999,
+          "matches": true
+        },
+        {
+          "id": "g_logistics_10",
+          "expected": "feature",
+          "predicted": "uncertain",
+          "score": 0.6149999999999999,
+          "matches": false
+        }
+      ]
+    },
+    "draft_quality": {
+      "skipped": "no company_id provided"
+    },
+    "approval_rate": {
+      "skipped": "no company_id provided"
+    }
+  }
+}
