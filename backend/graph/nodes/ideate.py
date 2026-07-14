@@ -49,6 +49,10 @@ class OwnedAngleItem(BaseModel):
     title: str = Field(..., description="Working headline for the piece.")
     angle: str = Field(..., description="One-sentence explanation of the angle.")
     pillar: str = Field("", description="Pillar name from content_pillars.")
+    fact_check_query: str = Field(
+        "",
+        description="4-10 word web-search query for the angle's most specific factual claim. Empty when the angle is about a first-person owned event (harvest, product launch) with no external fact to verify.",
+    )
 
 
 class OwnedAnglesDraft(BaseModel):
@@ -123,6 +127,18 @@ def ideate_node(state: ContentState) -> dict:
 # --- Owned branch ---
 
 def _ideate_owned(*, profile: dict, n: int, recent: set[str]) -> list[dict]:
+    """Generate owned angles, then run each through a fact-grounding step.
+
+    Each proposed angle carries a ``fact_check_query`` — a short live-web query
+    for the angle's most specific factual claim. We hit Tavily with it; if a
+    recent, high-quality article corroborates the claim, we attach its URL as
+    ``verified_source_url`` and let the angle through. If nothing corroborates,
+    the angle is dropped unless it's a first-person owned event (empty query).
+
+    This closes the "curator publishes unverified LLM assertions" gap without
+    turning owned angles into external ones — the citation is a fact-check
+    footnote, not the article being commentated on.
+    """
     if n <= 0:
         return []
     prompt = load_prompt("ideate_owned", "v1").format(
@@ -139,20 +155,57 @@ def _ideate_owned(*, profile: dict, n: int, recent: set[str]) -> list[dict]:
         return []
 
     now = _now_iso()
-    return [
-        {
-            "id": _cand_id("own", a.title),
+    out: list[dict] = []
+    for a in angles:
+        title = (a.title or "").strip()
+        if not title or title.lower() in recent:
+            continue
+        query = (a.fact_check_query or "").strip()
+        verified_url: str | None = None
+        verified_title: str | None = None
+        verified_date: str | None = None
+        if query:
+            hit = _fact_check_owned_angle(query)
+            if hit is None:
+                # Query was provided but no recent article backs the claim — drop.
+                log.info(
+                    "_ideate_owned: dropping unverified angle %r (query=%r)",
+                    title, query,
+                )
+                continue
+            verified_url = hit.url
+            verified_title = hit.title
+            verified_date = hit.published_date
+        # else: query empty → first-person owned event, no external fact to check
+        out.append({
+            "id": _cand_id("own", title),
             "kind": "owned",
-            "title": a.title.strip(),
+            "title": title,
             "angle": a.angle.strip(),
             "pillar": a.pillar,
             "source_id": None,
             "url": None,
+            "verified_source_url": verified_url,
+            "verified_source_title": verified_title,
+            "published_date": verified_date,
             "ts": now,
-        }
-        for a in angles
-        if a.title and a.title.lower().strip() not in recent
-    ]
+        })
+    return out
+
+
+def _fact_check_owned_angle(query: str):
+    """Return the top recent search hit for the angle's factual claim, or None.
+
+    Any hit within the last 30 days counts. We don't require perfect topical
+    match — just evidence the claim is real. Failures (Tavily down, no hits)
+    return None so the caller can drop the angle.
+    """
+    try:
+        results = search_content(query, max_results=3, days=30)
+    except Exception as e:
+        log.info("_fact_check_owned_angle: search failed for %r: %s", query, e)
+        return None
+    return results[0] if results else None
 
 
 # --- External branch ---

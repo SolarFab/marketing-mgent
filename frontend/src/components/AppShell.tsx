@@ -8,6 +8,7 @@ import { ChatRail } from "./ChatRail";
 
 const TABS = [
   { href: "/", label: "Review", hint: "Curation queue" },
+  { href: "/my-content", label: "My Content", hint: "Upload your own photos + stories" },
   { href: "/sources", label: "Sources", hint: "What we read" },
   { href: "/newsletter", label: "Newsletter", hint: "Drafts + layout" },
   { href: "/social", label: "Social", hint: "IG + LinkedIn" },

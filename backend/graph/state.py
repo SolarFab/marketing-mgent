@@ -16,7 +16,8 @@ class ContentState(TypedDict, total=False):
 
     candidates: list[dict]          # {id, kind, title, angle, source_id?, url?, pillar?, ts}
     scored: list[dict]              # + score, rationale, route
-    approved: list[dict]            # human-approved this cycle
+    approved: list[dict]            # human-approved this cycle (union across channels)
+    approved_by_channel: dict       # {newsletter: [item], instagram: [item], linkedin: [item]}
     feedback: list[dict]            # structured approve/reject captured this cycle
     source_proposals: list[dict]    # discovered sources awaiting user approval
 

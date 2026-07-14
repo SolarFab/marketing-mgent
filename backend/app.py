@@ -49,7 +49,7 @@ from typing import Any
 
 from pathlib import Path
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -66,6 +66,8 @@ from .graph import orchestrator as orch
 from .llm import make_llm
 from .memory import db as mem
 from .prompts import load_prompt
+from .tools import carousel as carousel_tool
+from .tools import upload_materialize as upload_tool
 from .tools.sources import normalize_source_url
 
 app = FastAPI(
@@ -87,6 +89,19 @@ app.add_middleware(
 _BRAND_REFS_DIR = Path(__file__).resolve().parent.parent / "data" / "brand-refs"
 _BRAND_REFS_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/brand-refs", StaticFiles(directory=str(_BRAND_REFS_DIR)), name="brand-refs")
+
+# Serve generated carousel slides so the frontend can preview them and
+# the Buffer publisher can (eventually) hand the URL to Buffer's API.
+_CAROUSELS_DIR = Path(__file__).resolve().parent.parent / "data" / "carousels"
+_CAROUSELS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/carousels", StaticFiles(directory=str(_CAROUSELS_DIR)), name="carousels")
+
+# User-uploaded photos land under data/user-uploads/{company_id}/{upload_id}.{ext}
+# and are served here so the frontend can preview them and the carousel step
+# can reference them by URL.
+_USER_UPLOADS_DIR = Path(__file__).resolve().parent.parent / "data" / "user-uploads"
+_USER_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/user-uploads", StaticFiles(directory=str(_USER_UPLOADS_DIR)), name="user-uploads")
 
 
 # ---------- helpers ----------
@@ -380,15 +395,28 @@ def submit_feedback(req: FeedbackIn) -> dict:
 
 
 class FinishReviewRequest(BaseModel):
+    """Per-channel routing: each channel gets its own list of item_ids.
+
+    The union of the three lists is what the user approved overall; the
+    per-channel breakdown drives which items each Write branch sees. A
+    story tagged for both newsletter and LinkedIn appears in both.
+    """
     cycle_id: str
     company_id: str | None = None
+    # Backwards-compat: if the client sends approved_ids, treat as newsletter-only.
     approved_ids: list[str] = Field(default_factory=list)
+    approved_by_channel: dict[str, list[str]] = Field(default_factory=dict)
 
 
 @app.post("/cycle/finish_review", summary="Resume the cycle after review")
 def finish_review(req: FinishReviewRequest) -> dict:
     """After the user finishes review, resume the graph so Learning +
-    Write can run. The frontend passes the list of approved item ids.
+    Write can run.
+
+    Payload shape: ``approved_by_channel = {"newsletter": [ids], "instagram": [ids], "linkedin": [ids]}``.
+    Each channel's Write draft is generated from only its own subset.
+    Falls back to ``approved_ids`` (flat) for older clients — those get
+    treated as newsletter-only.
     """
     cid = _company_id(req.company_id)
     graph = build_content_graph()
@@ -396,14 +424,34 @@ def finish_review(req: FinishReviewRequest) -> dict:
 
     snapshot = graph.get_state(cfg)
     scored = (snapshot.values or {}).get("scored") or []
-    approved = [c for c in scored if c["id"] in set(req.approved_ids)]
+    by_id = {c["id"]: c for c in scored}
 
-    # Also load fresh feedback rows for the learning window
+    per_channel: dict[str, list[dict]] = {}
+    if req.approved_by_channel:
+        for channel, ids in req.approved_by_channel.items():
+            per_channel[channel] = [by_id[i] for i in ids if i in by_id]
+    elif req.approved_ids:
+        per_channel = {"newsletter": [by_id[i] for i in req.approved_ids if i in by_id]}
+
+    # Union across channels — used for source-hit-rate + history stats
+    approved_union: list[dict] = []
+    seen: set[str] = set()
+    for items in per_channel.values():
+        for c in items:
+            if c["id"] not in seen:
+                seen.add(c["id"])
+                approved_union.append(c)
+
+    # Fresh feedback for the learning window
     feedback = mem.recent_feedback(cid, limit=settings().learning_window)
 
     graph.update_state(
         cfg,
-        {"approved": approved, "feedback": feedback},
+        {
+            "approved": approved_union,
+            "approved_by_channel": per_channel,
+            "feedback": feedback,
+        },
         as_node="review",
     )
     graph.invoke(None, cfg)  # continue until publish interrupt
@@ -411,6 +459,7 @@ def finish_review(req: FinishReviewRequest) -> dict:
     return {
         "cycle_id": req.cycle_id,
         "drafts": values.get("drafts"),
+        "channel_counts": {ch: len(items) for ch, items in per_channel.items()},
     }
 
 
@@ -459,6 +508,7 @@ def publish(req: PublishRequest) -> dict:
     state = {
         "company_id": cid,
         "cycle_id": req.cycle_id,
+        "company_profile": mem.get_profile(cid) or {},
         "drafts": {
             "newsletter": drafts_row.get("newsletter"),
             "instagram": drafts_row.get("instagram"),
@@ -560,6 +610,249 @@ def reason_histogram(company_id: str | None = None) -> dict:
 def underperformers(company_id: str | None = None) -> dict:
     cid = _company_id(company_id)
     return {"sources": learning.underperforming_sources(cid)}
+
+
+# ---------- user uploads (My Content) ----------
+
+
+@app.post("/uploads", summary="Upload a photo + story to draft channel content from")
+async def upload_content(
+    file: UploadFile = File(...),
+    story: str = Form(...),
+    title: str | None = Form(None),
+    pillar: str | None = Form(None),
+    company_id: str | None = Form(None),
+) -> dict:
+    """Persist the photo and metadata. Returns the row; frontend then calls
+    ``/uploads/{id}/materialize`` to turn it into channel drafts.
+    """
+    cid = _company_id(company_id)
+    # Derive extension from the upload's content type or filename
+    ext = "png"
+    filename = (file.filename or "").lower()
+    if filename.endswith((".jpg", ".jpeg")):
+        ext = "jpg"
+    elif filename.endswith(".webp"):
+        ext = "webp"
+    upload_dir = _USER_UPLOADS_DIR / cid
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    # Persist first so we get a stable id, then rename the file
+    row = mem.add_upload(
+        cid,
+        title=title,
+        story=story,
+        pillar=pillar,
+        photo_path="",  # placeholder; updated after file save
+        photo_url="",
+    )
+    uid = row["upload_id"]
+    saved_path = upload_dir / f"{uid}.{ext}"
+    body = await file.read()
+    saved_path.write_bytes(body)
+    photo_url = f"/user-uploads/{cid}/{uid}.{ext}"
+    mem.x(
+        "UPDATE user_uploads SET photo_path=%s, photo_url=%s WHERE upload_id=%s",
+        (str(saved_path), photo_url, uid),
+    )
+    return mem.get_upload(uid) or {}
+
+
+@app.get("/uploads", summary="List user-uploaded content for the company")
+def list_uploads(company_id: str | None = None) -> dict:
+    cid = _company_id(company_id)
+    return {"uploads": mem.list_uploads(cid)}
+
+
+@app.delete("/uploads/{upload_id}", summary="Delete an upload + its file")
+def delete_upload(upload_id: str) -> dict:
+    row = mem.get_upload(upload_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"upload {upload_id} not found")
+    photo_path = row.get("photo_path")
+    if photo_path:
+        try:
+            Path(photo_path).unlink(missing_ok=True)
+        except Exception:
+            pass
+    mem.delete_upload(upload_id)
+    return {"status": "ok"}
+
+
+class MaterializeRequest(BaseModel):
+    company_id: str | None = None
+    build_carousel_images: bool = Field(
+        False,
+        description="If true, actually generates the 4 AI-produced carousel slides via Nano Banana 2. Costs image credits. Slide 0 (user's photo) is always built.",
+    )
+
+
+@app.post("/uploads/{upload_id}/materialize", summary="Turn upload into newsletter/carousel/LinkedIn/IG drafts")
+def materialize_upload_endpoint(upload_id: str, req: MaterializeRequest) -> dict:
+    """One LLM call produces all four channel drafts. The carousel's hero
+    slide is the user's own photo (with an overlay); the other 4 slides can
+    optionally be rendered via Nano Banana 2 when ``build_carousel_images``
+    is true.
+    """
+    row = mem.get_upload(upload_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"upload {upload_id} not found")
+    cid = _company_id(req.company_id) or row["company_id"]
+    profile = mem.get_profile(cid) or {}
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"no profile for company_id={cid}")
+
+    try:
+        materialized = upload_tool.materialize_from_upload(upload=row, profile=profile)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"materialize failed: {e}")
+
+    payload: dict[str, Any] = {
+        "newsletter_section": materialized.newsletter_section.model_dump(),
+        "linkedin_post": materialized.linkedin_post,
+        "instagram_caption": materialized.instagram_caption,
+        "instagram_hashtags": materialized.instagram_hashtags,
+        "carousel_slides": [s.model_dump() for s in materialized.carousel_slides],
+        "hero_slide_url": None,
+        "generated_slides": [],
+    }
+
+    # Slide 0 — the user's photo, always built (cheap, deterministic)
+    cycle_id = "upload"  # namespace for upload-based carousels
+    photo_path = Path(row["photo_path"])
+    if photo_path.exists():
+        try:
+            upload_tool.paste_user_photo_as_hero(
+                upload_photo_path=photo_path,
+                cycle_id=cycle_id,
+                item_id=upload_id,
+                upload_title=row.get("title") or materialized.newsletter_section.heading,
+                brand=profile.get("brand") or {},
+            )
+            payload["hero_slide_url"] = carousel_tool.slide_url(cycle_id, upload_id, 0)
+        except Exception as e:
+            log.warning("materialize: hero build failed: %s", e)
+
+    # Slides 1-4 — Nano Banana 2, only if the caller opted in
+    if req.build_carousel_images:
+        ref_bytes: bytes | None = None
+        ref_path = _BRAND_REFS_DIR / f"{cid}.png"
+        if ref_path.exists():
+            ref_bytes = ref_path.read_bytes()
+        for i, slide in enumerate(materialized.carousel_slides, start=1):
+            png, err = carousel_tool.generate_slide_image(
+                image_prompt=slide.image_prompt,
+                reference_image_bytes=ref_bytes,
+            )
+            if png:
+                url = carousel_tool.save_slide(cycle_id, upload_id, i, png)
+                payload["generated_slides"].append({"index": i, "url": url, "role": slide.role})
+            else:
+                payload["generated_slides"].append({"index": i, "url": None, "role": slide.role, "error": err})
+
+    mem.save_upload_materialized(upload_id, payload)
+    return payload
+
+
+# ---------- carousel ----------
+
+class CarouselPlanRequest(BaseModel):
+    cycle_id: str
+    item_id: str
+    company_id: str | None = None
+
+
+class CarouselGenerateRequest(BaseModel):
+    cycle_id: str
+    item_id: str
+    company_id: str | None = None
+    slides: list[dict] = Field(default_factory=list, description="Optional edited plan slides; if empty, uses saved plan.")
+    only_slide: int | None = Field(None, description="If set, regenerate only this slide index (0-4).")
+
+
+@app.post("/carousel/plan", summary="Plan a 5-slide Instagram carousel for one approved story")
+def carousel_plan(req: CarouselPlanRequest) -> dict:
+    """Ask the LLM to plan the carousel. Persists the plan on disk so the
+    frontend can edit inline and the /generate step can pick it up.
+    """
+    cid = _company_id(req.company_id)
+    profile = mem.get_profile(cid) or {}
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"no profile for company_id={cid}")
+
+    # Find the story in the cycle's scored queue
+    from .graph.build import build_content_graph, cycle_thread
+
+    graph = build_content_graph()
+    cfg = cycle_thread(req.cycle_id)
+    snapshot = graph.get_state(cfg)
+    scored = (snapshot.values or {}).get("scored") or []
+    story = next((c for c in scored if c["id"] == req.item_id), None)
+    if not story:
+        raise HTTPException(status_code=404, detail=f"item {req.item_id} not in cycle {req.cycle_id}")
+
+    try:
+        plan = carousel_tool.plan_carousel(story=story, profile=profile)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"plan failed: {e}")
+
+    carousel_tool.save_plan(req.cycle_id, req.item_id, plan)
+    return {
+        "cycle_id": req.cycle_id,
+        "item_id": req.item_id,
+        "story_title": plan.story_title,
+        "slides": [s.model_dump() for s in plan.slides],
+    }
+
+
+@app.post("/carousel/generate", summary="Generate images for a planned carousel")
+def carousel_generate(req: CarouselGenerateRequest) -> dict:
+    """Runs the image model for each slide (or one, if ``only_slide`` set).
+
+    Returns URLs of the persisted PNGs relative to the backend
+    (e.g. ``/carousels/{cycle}/{item}/0.png``).
+    """
+    cid = _company_id(req.company_id)
+    profile = mem.get_profile(cid) or {}
+
+    # Merge: prefer client-supplied edited slides, else load persisted plan
+    if req.slides:
+        try:
+            plan = carousel_tool.CarouselPlan(story_title="(edited)", slides=[carousel_tool.Slide(**s) for s in req.slides])
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"invalid slides payload: {e}")
+    else:
+        plan = carousel_tool.load_plan(req.cycle_id, req.item_id)
+        if plan is None:
+            raise HTTPException(status_code=404, detail="no plan on disk; call /carousel/plan first")
+
+    # Load the brand reference bytes to condition every image
+    ref_bytes: bytes | None = None
+    ref_path = _BRAND_REFS_DIR / f"{cid}.png"
+    if ref_path.exists():
+        ref_bytes = ref_path.read_bytes()
+
+    indices = [req.only_slide] if req.only_slide is not None else list(range(len(plan.slides)))
+    outcomes: list[dict] = []
+    for i in indices:
+        if i < 0 or i >= len(plan.slides):
+            continue
+        slide = plan.slides[i]
+        png, err = carousel_tool.generate_slide_image(
+            image_prompt=slide.image_prompt,
+            reference_image_bytes=ref_bytes,
+        )
+        if png:
+            url = carousel_tool.save_slide(req.cycle_id, req.item_id, i, png)
+            outcomes.append({"index": i, "url": url, "role": slide.role})
+        else:
+            outcomes.append({"index": i, "url": None, "role": slide.role, "error": err})
+
+    return {
+        "cycle_id": req.cycle_id,
+        "item_id": req.item_id,
+        "outcomes": outcomes,
+    }
 
 
 # ---------- orchestrator ----------

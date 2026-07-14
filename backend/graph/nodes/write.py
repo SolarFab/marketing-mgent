@@ -31,8 +31,16 @@ log = logging.getLogger(__name__)
 # --- Schemas ---
 
 class NewsletterSection(BaseModel):
+    category: str = Field(
+        "",
+        description="Short editorial category tag in ALL CAPS — 1 to 4 words, e.g. 'AI / CONSUMER HARDWARE', 'E-COMMERCE & SUPPLY CHAIN', 'ELECTRIC VEHICLES & ENERGY'. Rendered as a dark pill above the headline.",
+    )
     heading: str = ""
     body_markdown: str = ""
+    highlight_term: str = Field(
+        "",
+        description="A single word or short phrase (2-4 words max) from body_markdown that should be highlighted in brand accent color when rendered. Pick the term that carries the story's tension or key claim — e.g. 'Chinese', '$14 billion', 'Five-Minute Charge'. Leave empty if no natural highlight.",
+    )
     link: str = ""
 
 
@@ -54,15 +62,28 @@ class SocialDrafts(BaseModel):
 # --- Node ---
 
 def write_node(state: ContentState) -> dict:
-    """Generate newsletter + Instagram + LinkedIn drafts from ``approved``.
+    """Generate newsletter + Instagram + LinkedIn drafts, per-channel.
 
     Reads:
-        * ``approved`` — the list the HITL step greenlit
+        * ``approved_by_channel`` — {newsletter: [item], instagram: [item], linkedin: [item]}
+          Each channel writes from its own subset. A channel with an empty
+          list gets a ``None`` draft rather than generating from other
+          channels' items.
+        * ``approved`` — fallback for older callers; treated as newsletter-only.
         * ``company_profile`` — for voice, pillars, ICP
         * ``cycle_id`` — draft persistence key
     """
-    approved = state.get("approved") or []
-    if not approved:
+    by_channel: dict[str, list[dict]] = state.get("approved_by_channel") or {}
+    if not by_channel:
+        # Back-compat: dump the flat approved list into newsletter only.
+        flat = state.get("approved") or []
+        by_channel = {"newsletter": list(flat)} if flat else {}
+
+    newsletter_items = by_channel.get("newsletter") or []
+    instagram_items = by_channel.get("instagram") or []
+    linkedin_items = by_channel.get("linkedin") or []
+
+    if not (newsletter_items or instagram_items or linkedin_items):
         empty = {"newsletter": None, "instagram": None, "linkedin": None}
         return {"drafts": empty}
 
@@ -70,18 +91,37 @@ def write_node(state: ContentState) -> dict:
     cycle_id = state.get("cycle_id") or "adhoc"
     company_id = state.get("company_id") or "demo"
 
-    layout = _pick_layout(state, approved)
+    # Layout heuristic still keys off the newsletter set.
+    layout = _pick_layout(state, newsletter_items) if newsletter_items else "digest"
 
-    newsletter = _write_newsletter(approved=approved, profile=profile, layout=layout)
-    social = _write_social(approved=approved, profile=profile)
+    newsletter = (
+        _write_newsletter(approved=newsletter_items, profile=profile, layout=layout)
+        if newsletter_items
+        else None
+    )
+
+    # Social: one LLM call handles IG and LinkedIn together. If the two
+    # channels have DIFFERENT sets, call twice — once with the IG set for
+    # IG, once with the LinkedIn set for LinkedIn — and merge.
+    ig_draft: dict | None = None
+    li_draft: dict | None = None
+    if instagram_items and linkedin_items and _same_ids(instagram_items, linkedin_items):
+        # Same set for both — one LLM call
+        social = _write_social(approved=instagram_items, profile=profile)
+        ig_draft = {"caption": social.instagram, "hashtags": social.instagram_hashtags}
+        li_draft = {"post": social.linkedin}
+    else:
+        if instagram_items:
+            social_ig = _write_social(approved=instagram_items, profile=profile)
+            ig_draft = {"caption": social_ig.instagram, "hashtags": social_ig.instagram_hashtags}
+        if linkedin_items:
+            social_li = _write_social(approved=linkedin_items, profile=profile)
+            li_draft = {"post": social_li.linkedin}
 
     drafts = {
         "newsletter": newsletter,
-        "instagram": {
-            "caption": social.instagram,
-            "hashtags": social.instagram_hashtags,
-        },
-        "linkedin": {"post": social.linkedin},
+        "instagram": ig_draft,
+        "linkedin": li_draft,
     }
 
     try:
@@ -90,10 +130,15 @@ def write_node(state: ContentState) -> dict:
         log.warning("write_node: save_drafts failed: %s", e)
 
     log.info(
-        "write_node: cycle=%s layout=%s newsletter_sections=%d",
-        cycle_id, layout, len(newsletter.get("sections") or []),
+        "write_node: cycle=%s layout=%s | newsletter=%d IG=%d LinkedIn=%d",
+        cycle_id, layout,
+        len(newsletter_items), len(instagram_items), len(linkedin_items),
     )
     return {"drafts": drafts}
+
+
+def _same_ids(a: list[dict], b: list[dict]) -> bool:
+    return {i["id"] for i in a} == {i["id"] for i in b}
 
 
 # --- Helpers ---

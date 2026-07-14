@@ -331,6 +331,52 @@ def latest_drafts(company_id: str) -> dict | None:
 
 # ---------- publish log ----------
 
+# ---------- user uploads ----------
+
+def add_upload(
+    company_id: str,
+    *,
+    title: str | None,
+    story: str,
+    pillar: str | None,
+    photo_path: str,
+    photo_url: str,
+) -> dict:
+    uid = new_id("u")
+    x(
+        """
+        INSERT INTO user_uploads (upload_id, company_id, title, story, pillar, photo_path, photo_url)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        (uid, company_id, title, story, pillar, photo_path, photo_url),
+    )
+    return q1("SELECT * FROM user_uploads WHERE upload_id=%s", (uid,)) or {}
+
+
+def list_uploads(company_id: str) -> list[dict]:
+    return q(
+        "SELECT * FROM user_uploads WHERE company_id=%s ORDER BY created_at DESC",
+        (company_id,),
+    )
+
+
+def get_upload(upload_id: str) -> dict | None:
+    return q1("SELECT * FROM user_uploads WHERE upload_id=%s", (upload_id,))
+
+
+def delete_upload(upload_id: str) -> None:
+    x("DELETE FROM user_uploads WHERE upload_id=%s", (upload_id,))
+
+
+def save_upload_materialized(upload_id: str, materialized: dict) -> None:
+    """Persist the drafts (newsletter section / carousel plan / posts) so the
+    Materialize preview survives page reloads."""
+    x(
+        "UPDATE user_uploads SET materialized = %s::jsonb WHERE upload_id=%s",
+        (json.dumps(materialized), upload_id),
+    )
+
+
 def log_publish(
     company_id: str,
     channel: str,

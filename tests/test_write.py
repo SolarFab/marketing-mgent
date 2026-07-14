@@ -52,8 +52,14 @@ def test_write_node_generates_all_three_channels_and_persists(clean_db, sample_p
         {"id": "c1", "title": "Harvest is starting", "angle": "first Riesling in", "kind": "owned", "pillar": "place"},
         {"id": "c2", "title": "Family history since 1897", "angle": "5th gen", "kind": "owned", "pillar": "people"},
     ]
+    # Per-channel routing: all three channels get the same set here for a smoke test.
     state = {
         "approved": approved,
+        "approved_by_channel": {
+            "newsletter": approved,
+            "instagram": approved,
+            "linkedin": approved,
+        },
         "company_profile": sample_profile,
         "company_id": "cid_write",
         "cycle_id": "cyc_write",

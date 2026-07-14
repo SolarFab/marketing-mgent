@@ -92,6 +92,10 @@ export type Candidate = {
   pillar?: string;
   source_id?: string;
   url?: string;
+  // For OWNED angles that passed the fact-grounding step, the top-matching
+  // recent article the agent found to corroborate the angle's factual claim.
+  verified_source_url?: string | null;
+  verified_source_title?: string | null;
   published_date?: string | null;
   score?: {
     relevance: number;
@@ -109,7 +113,13 @@ export type NewsletterDraft = {
   subject?: string;
   preheader?: string;
   intro?: string;
-  sections?: { heading?: string; body_markdown?: string; link?: string }[];
+  sections?: {
+    category?: string;
+    heading?: string;
+    body_markdown?: string;
+    highlight_term?: string;
+    link?: string;
+  }[];
   signoff?: string;
   layout?: string;
 };
@@ -196,10 +206,21 @@ export const api = {
       method: "POST",
       body: { ...payload, company_id: COMPANY_ID },
     }),
-  finishReview: (cycle_id: string, approved_ids: string[]) =>
-    req<{ cycle_id: string; drafts: unknown }>("/cycle/finish_review", {
+  finishReview: (
+    cycle_id: string,
+    approved_by_channel: {
+      newsletter: string[];
+      instagram: string[];
+      linkedin: string[];
+    },
+  ) =>
+    req<{
+      cycle_id: string;
+      drafts: unknown;
+      channel_counts: Record<string, number>;
+    }>("/cycle/finish_review", {
       method: "POST",
-      body: { cycle_id, approved_ids, company_id: COMPANY_ID },
+      body: { cycle_id, approved_by_channel, company_id: COMPANY_ID },
     }),
 
   // drafts / publish
@@ -269,4 +290,91 @@ export const api = {
       result: any;
       reply: string;
     }>("/chat", { method: "POST", body: { company_id: COMPANY_ID, message, context } }),
+
+  // uploads (My Content)
+  listUploads: () =>
+    req<{ uploads: any[] }>(
+      `/uploads?company_id=${encodeURIComponent(COMPANY_ID)}`,
+    ),
+  uploadContent: (
+    file: File,
+    fields: { story: string; title?: string; pillar?: string },
+  ) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("story", fields.story);
+    if (fields.title) form.append("title", fields.title);
+    if (fields.pillar) form.append("pillar", fields.pillar);
+    form.append("company_id", COMPANY_ID);
+    return fetch(`${BACKEND_URL}/uploads`, {
+      method: "POST",
+      body: form,
+    }).then(async (r) => {
+      const text = await r.text();
+      const data = text ? JSON.parse(text) : null;
+      if (!r.ok) throw new ApiError(data?.detail || r.statusText, r.status, data);
+      return data as any;
+    });
+  },
+  deleteUpload: (upload_id: string) =>
+    req<{ status: string }>(`/uploads/${upload_id}`, { method: "DELETE" }),
+  materializeUpload: (upload_id: string, build_carousel_images = false) =>
+    req<{
+      newsletter_section: {
+        category?: string;
+        heading?: string;
+        body_markdown?: string;
+        highlight_term?: string;
+      };
+      carousel_slides: {
+        role: string;
+        big_text: string;
+        subhead: string;
+        image_prompt: string;
+      }[];
+      linkedin_post: string;
+      instagram_caption: string;
+      instagram_hashtags: string[];
+      hero_slide_url: string | null;
+      generated_slides: { index: number; url: string | null; role: string; error?: string }[];
+    }>(`/uploads/${upload_id}/materialize`, {
+      method: "POST",
+      body: { company_id: COMPANY_ID, build_carousel_images },
+    }),
+
+  // carousel
+  carouselPlan: (cycle_id: string, item_id: string) =>
+    req<{
+      cycle_id: string;
+      item_id: string;
+      story_title: string;
+      slides: {
+        role: string;
+        big_text: string;
+        subhead: string;
+        image_prompt: string;
+      }[];
+    }>("/carousel/plan", {
+      method: "POST",
+      body: { cycle_id, item_id, company_id: COMPANY_ID },
+    }),
+  carouselGenerate: (
+    cycle_id: string,
+    item_id: string,
+    opts: { slides?: unknown[]; only_slide?: number } = {},
+  ) =>
+    req<{
+      cycle_id: string;
+      item_id: string;
+      outcomes: { index: number; url: string | null; role: string; error?: string }[];
+    }>("/carousel/generate", {
+      method: "POST",
+      body: {
+        cycle_id,
+        item_id,
+        company_id: COMPANY_ID,
+        slides: opts.slides,
+        only_slide: opts.only_slide,
+      },
+    }),
 };

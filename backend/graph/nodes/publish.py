@@ -43,7 +43,12 @@ def publish_node(state: ContentState) -> dict:
     }
 
     if publish_plan.get("newsletter", {}).get("approved") and drafts.get("newsletter"):
-        result = send_newsletter(draft=drafts["newsletter"])
+        # Pull brand + profile so the sender's template renders in the
+        # business's own palette. Falls back to defaults if profile is
+        # missing (e.g. during test paths).
+        profile = state.get("company_profile") or mem.get_profile(company_id) or {}
+        brand = profile.get("brand") or {}
+        result = send_newsletter(draft=drafts["newsletter"], brand=brand, profile=profile)
         outcomes["newsletter"] = result
         _log(company_id, cycle_id, "newsletter", result)
 

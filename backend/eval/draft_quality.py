@@ -75,8 +75,18 @@ Return JSON.
 """
 
 
+# Judge model is deliberately different from the production extraction/write
+# models so we don't have a "model grading its own homework" bias.
+JUDGE_MODEL = "openai/gpt-4o-mini"
+
+
 def voice_match_score(*, draft_text: str, profile: dict) -> RubricScore:
-    """One rubric-based judge call on a single draft snippet."""
+    """One rubric-based judge call on a single draft snippet.
+
+    Uses :data:`JUDGE_MODEL` (GPT-4o mini) rather than the production
+    extraction/writer model, so the judge and the generator are always
+    different models. Removes the self-grading bias.
+    """
     voice = profile.get("voice") or {}
     market = profile.get("market") or {}
     prompt = _JUDGE_PROMPT.format(
@@ -84,7 +94,7 @@ def voice_match_score(*, draft_text: str, profile: dict) -> RubricScore:
         market=json.dumps(market, ensure_ascii=False),
         draft=draft_text[:3000],
     )
-    llm = make_llm(temperature=0.0)
+    llm = make_llm(model=JUDGE_MODEL, temperature=0.0)
     return llm.with_structured_output(RubricScore).invoke(prompt)
 
 

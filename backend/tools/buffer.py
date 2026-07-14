@@ -29,22 +29,16 @@ log = logging.getLogger(__name__)
 _BUFFER_URL = "https://api.buffer.com/graphql"
 
 _CREATE_POST_MUTATION = """
-mutation CreatePost(
-  $organizationId: OrganizationId,
-  $channels: [ChannelId!]!,
-  $content: PostContentInput!,
-  $status: PostStatus
-) {
-  createPost(input: {
-    organizationId: $organizationId,
-    channels: $channels,
-    content: $content,
-    status: $status
-  }) {
-    ... on PostActionSuccess { id }
-    ... on GenericError { message }
+mutation CreatePost($input: CreatePostInput!) {
+  createPost(input: $input) {
+    __typename
+    ... on PostActionSuccess { post { id } }
     ... on UnexpectedError { message }
-    ... on ValidationError { message }
+    ... on InvalidInputError { message }
+    ... on NotFoundError { message }
+    ... on UnauthorizedError { message }
+    ... on RestProxyError { message }
+    ... on LimitReachedError { message }
   }
 }
 """.strip()
@@ -87,10 +81,22 @@ def create_draft_post(
     if not channel_id:
         return {"status": "error", "error": f"buffer channel id for {channel} missing", "mode": "real"}
 
+    if channel == "instagram":
+        return {
+            "status": "error",
+            "error": "Instagram drafts require an image or video asset; text-only publishing is blocked by the platform.",
+            "mode": "real",
+        }
+
     variables = {
-        "channels": [channel_id],
-        "content": {"text": text},
-        "status": "DRAFT",
+        "input": {
+            "channelId": channel_id,
+            "text": text,
+            "assets": [],
+            "mode": "addToQueue",
+            "schedulingType": "automatic",
+            "saveToDraft": True,
+        }
     }
     payload = {"query": _CREATE_POST_MUTATION, "variables": variables}
     headers = {
@@ -111,6 +117,10 @@ def create_draft_post(
         return {"status": "error", "error": str(data["errors"])[:300], "mode": "real"}
 
     result = (data.get("data") or {}).get("createPost") or {}
+    typename = result.get("__typename", "")
+    if typename == "PostActionSuccess":
+        post_id = (result.get("post") or {}).get("id", "")
+        return {"status": "ok", "external_id": post_id, "mode": "real"}
     if result.get("message"):
-        return {"status": "error", "error": result["message"], "mode": "real"}
-    return {"status": "ok", "external_id": result.get("id", ""), "mode": "real"}
+        return {"status": "error", "error": f"{typename}: {result['message']}", "mode": "real"}
+    return {"status": "error", "error": f"unexpected response: {result}", "mode": "real"}

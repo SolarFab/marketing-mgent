@@ -1,0 +1,210 @@
+{
+  "generated_at": "2026-07-13T10:27:50.332592+00:00",
+  "url": "https://chinatechsignals.com",
+  "slug": "demo-prompts",
+  "model": "anthropic/claude-haiku-4.5",
+  "judge_model": "openai/gpt-4o-mini",
+  "variants": [
+    {
+      "version": "v1",
+      "label": "v1 \u2014 rule-heavy zero-shot",
+      "description": "Detailed prescriptive rules, no worked examples. Production default.",
+      "latency_s": 14.393167972564697,
+      "input_tokens": 2625,
+      "output_tokens": 645,
+      "profile": {
+        "identity": {
+          "summary": "Daily curated intelligence on Chinese tech developments for European founders, operators, and investors.",
+          "products": [
+            "Daily newsletter",
+            "News analysis articles",
+            "Market signals database"
+          ]
+        },
+        "market": {
+          "segments": [
+            "European founders",
+            "European operators",
+            "European investors",
+            "Tech entrepreneurs"
+          ],
+          "geo": [
+            "Europe",
+            "China"
+          ],
+          "icp": "European tech founder or investor seeking competitive intelligence on Chinese innovation in autonomous driving, robotics, AI, and advanced materials."
+        },
+        "positioning": {
+          "value_prop": "See what China built first \u2014 curated daily funding rounds, product launches, and market signals from China to help European tech leaders understand competitive threats and opportunities.",
+          "differentiators": [
+            "Daily curation cadence focused on China-to-Europe implications",
+            "Analysis tied to strategic action for European founders and investors",
+            "Coverage of emerging sectors (robotics, world models, quantum, materials) before mainstream media",
+            "Signals-based approach highlighting what's shipping, not hype"
+          ]
+        },
+        "voice": {
+          "tone": [
+            "analytical",
+            "urgent",
+            "strategic",
+            "measured"
+          ],
+          "vocabulary": [
+            "signals",
+            "strategic compass",
+            "implications",
+            "pivot",
+            "ambitions",
+            "redefine",
+            "critical need",
+            "blueprint",
+            "outmaneuvered",
+            "reprice"
+          ],
+          "do": [
+            "Lead with concrete funding rounds and product launches",
+            "Frame Chinese developments as European strategic imperatives",
+            "Use directional language ('must respond', 'cannot ignore')",
+            "Provide actionable framing for decision-makers"
+          ],
+          "dont": [
+            "Hype or sensationalism",
+            "Generic tech news",
+            "Buzzwords without grounding",
+            "Neutral tone \u2014 always frames China developments as competitive pressure"
+          ]
+        },
+        "content_pillars": {
+          "autonomous_systems": "Autonomous driving, robotics, and embodied AI developments from Chinese companies (ByteDance world models, Momenta IPO, Kepler Robotics, UBTECH humanoids) and their implications for European strategy.",
+          "frontier_tech": "Emerging technology breakthroughs in quantum computing, advanced materials, fusion energy, and chip packaging where China is signaling leadership.",
+          "ai_monetization": "How Chinese AI companies are building revenue models, user loyalty strategies, and physical AI applications \u2014 lessons for European founders.",
+          "market_signals": "Funding rounds, IPOs, and strategic pivots from Chinese tech companies that signal sector momentum and competitive positioning."
+        },
+        "content_mix": 0.25,
+        "brand": {
+          "primary_color": "#0a0a0a",
+          "accent_color": "#ef4444",
+          "background_color": "#0a0a0a",
+          "text_color": "#ffffff"
+        }
+      },
+      "completeness": {
+        "products": 3,
+        "segments": 4,
+        "geo": 2,
+        "differentiators": 4,
+        "voice_tone": 4,
+        "voice_vocabulary": 10,
+        "voice_do": 4,
+        "voice_dont": 4,
+        "pillars": 4,
+        "content_mix": 0.25
+      },
+      "judge": {
+        "identity_ok": 5,
+        "market_ok": 5,
+        "voice_ok": 5,
+        "pillars_ok": 5,
+        "mix_ok": 4,
+        "rationale": "The extraction accurately reflects the site's focus on Chinese tech developments for a European audience, with strong alignment in identity, market, voice, and content pillars, though the content mix could be slightly more reflective of the business archetype."
+      },
+      "error": null
+    },
+    {
+      "version": "v2",
+      "label": "v2 \u2014 few-shot with worked examples",
+      "description": "Two full worked-example profiles inline (wine estate + logistics startup).",
+      "latency_s": 5.510644912719727,
+      "input_tokens": 2694,
+      "output_tokens": 445,
+      "profile": {
+        "identity": {
+          "summary": "Daily curated intelligence on Chinese tech breakthroughs, funding rounds, and market signals for European founders, operators, and investors.",
+          "products": [
+            "daily newsletter",
+            "news analysis",
+            "market signals"
+          ]
+        },
+        "market": {
+          "segments": [
+            "European founders",
+            "European operators",
+            "European investors"
+          ],
+          "geo": [
+            "Europe"
+          ],
+          "icp": "European founder or operator evaluating competitive threats from Chinese tech, or investor assessing market shifts driven by Chinese innovation"
+        },
+        "positioning": {
+          "value_prop": "See what China built first \u2014 curated daily signals on Chinese tech breakthroughs, funding, and product launches to help European builders understand competitive threats and market shifts.",
+          "differentiators": [
+            "daily curation",
+            "China-to-Europe lens",
+            "focus on founders and operators",
+            "concrete funding and product data"
+          ]
+        },
+        "voice": {
+          "tone": [
+            "analytical",
+            "urgent",
+            "strategic"
+          ],
+          "vocabulary": [
+            "signals",
+            "breakthroughs",
+            "competitive threat",
+            "market shift",
+            "strategic implications"
+          ],
+          "do": [
+            "connect Chinese moves to European impact",
+            "cite concrete funding rounds and product launches",
+            "frame as strategic compass for decision-making"
+          ],
+          "dont": [
+            "hype",
+            "generic tech commentary",
+            "buzzwords without grounding"
+          ]
+        },
+        "content_pillars": {
+          "industry": "Chinese tech breakthroughs in autonomous driving, robotics, AI, materials, and semiconductors with direct European implications",
+          "funding": "Chinese startup funding rounds, valuations, and investor moves that signal market direction",
+          "strategy": "analysis of how European founders and investors should respond to Chinese competitive moves"
+        },
+        "content_mix": 0.2,
+        "brand": {
+          "primary_color": "#0a0a0a",
+          "accent_color": "#ef4444",
+          "background_color": "#0a0a0a",
+          "text_color": "#ffffff"
+        }
+      },
+      "completeness": {
+        "products": 3,
+        "segments": 3,
+        "geo": 1,
+        "differentiators": 4,
+        "voice_tone": 3,
+        "voice_vocabulary": 5,
+        "voice_do": 3,
+        "voice_dont": 3,
+        "pillars": 3,
+        "content_mix": 0.2
+      },
+      "judge": {
+        "identity_ok": 5,
+        "market_ok": 5,
+        "voice_ok": 5,
+        "pillars_ok": 5,
+        "mix_ok": 4,
+        "rationale": "The extraction accurately reflects the site's focus on Chinese tech insights for a European audience, with strong alignment in identity, market, voice, and content pillars, though the content mix could be slightly more balanced."
+      },
+      "error": null
+    }
+  ]
+}
