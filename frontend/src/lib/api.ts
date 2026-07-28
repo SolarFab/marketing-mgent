@@ -32,16 +32,32 @@ async function req<T>(path: string, init: Init = {}): Promise<T> {
     body: init.body ? JSON.stringify(init.body) : undefined,
     cache: "no-store",
   });
-  const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
   if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let data: any = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      // Non-JSON error body (HTML 502, plain-text 500) — fall through.
+    }
     throw new ApiError(
-      typeof data?.detail === "string" ? data.detail : res.statusText,
+      typeof data?.detail === "string"
+        ? data.detail
+        : `HTTP ${res.status} ${res.statusText}${text ? ` — ${text.slice(0, 300)}` : ""}`,
       res.status,
-      data,
+      data ?? text,
     );
   }
-  return data as T;
+  const text = await res.text();
+  try {
+    return (text ? JSON.parse(text) : null) as T;
+  } catch {
+    throw new ApiError(
+      `Invalid JSON in response (status ${res.status})`,
+      res.status,
+      text,
+    );
+  }
 }
 
 // ---------- typed endpoints ----------
@@ -177,19 +193,19 @@ export const api = {
   deleteSource: (source_id: string) =>
     req<{ status: string }>(`/sources/${source_id}`, { method: "DELETE" }),
   discoverSources: () =>
-    req<{ proposed: number; sources: Source[] }>("/sources/discover", {
-      method: "POST",
-      body: { company_id: COMPANY_ID },
-    }),
+    req<{ proposed: number; sources: Source[] }>(
+      `/sources/discover${COMPANY_ID ? `?company_id=${encodeURIComponent(COMPANY_ID)}` : ""}`,
+      { method: "POST" },
+    ),
   acceptSource: (source_id: string) =>
     req<{ status: string }>(`/sources/${source_id}/accept`, { method: "POST" }),
 
   // cycle
   runCycle: () =>
-    req<{ cycle_id: string; candidates: Candidate[] }>("/cycle/run", {
-      method: "POST",
-      body: { company_id: COMPANY_ID },
-    }),
+    req<{ cycle_id: string; candidates: Candidate[] }>(
+      `/cycle/run${COMPANY_ID ? `?company_id=${encodeURIComponent(COMPANY_ID)}` : ""}`,
+      { method: "POST" },
+    ),
   getQueue: (cycle_id: string) =>
     req<{ cycle_id: string; candidates: Candidate[] }>(
       `/queue?cycle_id=${encodeURIComponent(cycle_id)}`,
@@ -310,10 +326,32 @@ export const api = {
       method: "POST",
       body: form,
     }).then(async (r) => {
+      if (!r.ok) {
+        const text = await r.text().catch(() => "");
+        let data: any = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch {
+          // Non-JSON error body — fall through.
+        }
+        throw new ApiError(
+          typeof data?.detail === "string"
+            ? data.detail
+            : `HTTP ${r.status} ${r.statusText}${text ? ` — ${text.slice(0, 300)}` : ""}`,
+          r.status,
+          data ?? text,
+        );
+      }
       const text = await r.text();
-      const data = text ? JSON.parse(text) : null;
-      if (!r.ok) throw new ApiError(data?.detail || r.statusText, r.status, data);
-      return data as any;
+      try {
+        return (text ? JSON.parse(text) : null) as any;
+      } catch {
+        throw new ApiError(
+          `Invalid JSON in response (status ${r.status})`,
+          r.status,
+          text,
+        );
+      }
     });
   },
   deleteUpload: (upload_id: string) =>

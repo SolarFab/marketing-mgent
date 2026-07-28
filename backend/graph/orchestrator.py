@@ -103,10 +103,13 @@ def _route_message(*, message: str, profile: dict, context: dict[str, Any]) -> R
     )
     llm = make_llm(temperature=0.1)
     try:
-        return llm.with_structured_output(RouteDecision).invoke(prompt)
+        decision = llm.with_structured_output(RouteDecision).invoke(prompt)
     except Exception as e:
         log.warning("_route_message: structured output failed (%s)", e)
+        decision = None
+    if decision is None:  # model may emit no tool call → invoke() returns None
         return RouteDecision(action="chat", reply="Sorry — I didn't catch that. Can you rephrase?")
+    return decision
 
 
 # --- Dispatch ---
@@ -149,12 +152,20 @@ def _dispatch(d: RouteDecision, *, company_id: str) -> dict[str, Any]:
         if not d.url_or_name:
             return {"kind": "error", "error": "no source provided"}
         rows = mem.q(
-            "SELECT source_id FROM sources WHERE company_id=%s AND (url ILIKE %s OR name ILIKE %s)",
+            "SELECT source_id, url, name FROM sources WHERE company_id=%s AND (url ILIKE %s OR name ILIKE %s)",
             (company_id, f"%{d.url_or_name}%", f"%{d.url_or_name}%"),
         )
-        for r in rows:
-            mem.delete_source(r["source_id"])
-        return {"kind": "source_unfollowed", "count": len(rows)}
+        # Deleting is irreversible — only act on an unambiguous match.
+        if len(rows) > 1:
+            matches = [r.get("name") or r.get("url") for r in rows]
+            return {
+                "kind": "error",
+                "error": f"'{d.url_or_name}' matches {len(rows)} sources: {', '.join(matches[:5])}. Be more specific.",
+            }
+        if not rows:
+            return {"kind": "source_unfollowed", "count": 0}
+        mem.delete_source(rows[0]["source_id"])
+        return {"kind": "source_unfollowed", "count": 1}
 
     if action == "discover_sources":
         proposals = discovery.discover_and_stage(company_id)

@@ -2,7 +2,7 @@
 // Sources — active + proposed sources, per-source hit-rate, content-mix slider.
 // The agent proposes, the user disposes. PRD §8.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type Source, type Profile } from "@/lib/api";
 
 export default function SourcesPage() {
@@ -60,26 +60,49 @@ export default function SourcesPage() {
   }
 
   async function toggle(s: Source) {
-    await api.patchSource(s.source_id, s.status === "active" ? "paused" : "active");
-    load();
+    try {
+      await api.patchSource(s.source_id, s.status === "active" ? "paused" : "active");
+      load();
+    } catch (e: any) {
+      setError(e.message || String(e));
+    }
   }
 
   async function unfollow(s: Source) {
     if (!confirm(`Unfollow ${s.url}?`)) return;
-    await api.deleteSource(s.source_id);
-    load();
+    try {
+      await api.deleteSource(s.source_id);
+      load();
+    } catch (e: any) {
+      setError(e.message || String(e));
+    }
   }
 
   async function accept(s: Source) {
-    await api.acceptSource(s.source_id);
-    load();
+    try {
+      await api.acceptSource(s.source_id);
+      load();
+    } catch (e: any) {
+      setError(e.message || String(e));
+    }
   }
 
-  async function updateMix(next: number) {
+  // Debounce the content-mix PUT so dragging the slider doesn't fire a
+  // request per step (out-of-order responses could persist a stale value).
+  const mixCommit = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function updateMix(next: number) {
     if (!profile) return;
     const updated: Profile = { ...profile, content_mix: next };
     setProfile(updated);
-    await api.updateProfile(updated);
+    if (mixCommit.current) clearTimeout(mixCommit.current);
+    mixCommit.current = setTimeout(async () => {
+      try {
+        await api.updateProfile(updated);
+      } catch (e: any) {
+        setError(e.message || String(e));
+      }
+    }, 400);
   }
 
   const active = sources.filter((s) => s.status !== "proposed");

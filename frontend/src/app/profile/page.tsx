@@ -3,8 +3,8 @@
 // Visual cards over the extracted profile + brand + learned rules,
 // plus a raw-JSON escape hatch for power edits.
 
-import { useCallback, useEffect, useState } from "react";
-import { api, type Brand, type Profile } from "@/lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, BACKEND_URL, type Brand, type Profile } from "@/lib/api";
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -21,13 +21,20 @@ export default function ProfilePage() {
 
   const load = useCallback(async () => {
     try {
+      let learningError: string | null = null;
       const [p, l] = await Promise.all([
         api.getProfile().catch(() => null),
-        api.getLearning(),
+        api.getLearning().catch((e: any) => {
+          learningError = e.message || String(e);
+          return null;
+        }),
       ]);
       setProfile(p);
       setJson(JSON.stringify(p, null, 2));
       setLearning(l);
+      if (learningError) {
+        setMsg({ tone: "warn", text: `Couldn't load learning data: ${learningError}` });
+      }
     } catch (e: any) {
       setMsg({ tone: "warn", text: e.message || String(e) });
     }
@@ -52,32 +59,51 @@ export default function ProfilePage() {
     }
   }
 
-  async function saveMix(next: number) {
+  // Debounce the content-mix PUT so dragging the slider doesn't fire a
+  // request per step (out-of-order responses could persist a stale value).
+  const mixCommit = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function saveMix(next: number) {
     if (!profile) return;
-    setSavingMix(true);
     const updated = { ...profile, content_mix: next };
     setProfile(updated);
     setJson(JSON.stringify(updated, null, 2));
-    try {
-      await api.updateProfile(updated);
-    } catch (e: any) {
-      setMsg({ tone: "warn", text: e.message || String(e) });
-    } finally {
-      setSavingMix(false);
-    }
+    if (mixCommit.current) clearTimeout(mixCommit.current);
+    mixCommit.current = setTimeout(async () => {
+      setSavingMix(true);
+      try {
+        await api.updateProfile(updated);
+      } catch (e: any) {
+        setMsg({ tone: "warn", text: e.message || String(e) });
+      } finally {
+        setSavingMix(false);
+      }
+    }, 400);
   }
 
   async function confirmRule(r: string) {
-    await api.confirmRule(r);
-    load();
+    try {
+      await api.confirmRule(r);
+      load();
+    } catch (e: any) {
+      setMsg({ tone: "warn", text: e.message || String(e) });
+    }
   }
   async function dismissRule(r: string) {
-    await api.dismissRule(r);
-    load();
+    try {
+      await api.dismissRule(r);
+      load();
+    } catch (e: any) {
+      setMsg({ tone: "warn", text: e.message || String(e) });
+    }
   }
   async function deleteRule(r: string) {
-    await api.deleteRule(r);
-    load();
+    try {
+      await api.deleteRule(r);
+      load();
+    } catch (e: any) {
+      setMsg({ tone: "warn", text: e.message || String(e) });
+    }
   }
 
   if (!profile) {
@@ -89,6 +115,13 @@ export default function ProfilePage() {
             The agent's model of your brand + everything it's learned about your taste.
           </p>
         </header>
+        {msg && (
+          <div className={`mb-4 rounded border px-3 py-2 text-sm ${
+            msg.tone === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"
+          }`}>
+            {msg.text}
+          </div>
+        )}
         <div className="rounded-lg border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
           No profile yet. Head to the <a href="/onboard" className="text-blue-700 underline">Onboard</a> tab to set one up.
         </div>
@@ -308,9 +341,8 @@ function BrandHero({
   brand?: Brand;
   identity?: Profile["identity"];
 }) {
-  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8765";
   const refUrl = brand?.reference_image_url
-    ? `${backend}${brand.reference_image_url}`
+    ? `${BACKEND_URL}${brand.reference_image_url}`
     : null;
 
   const swatches: { label: string; hex?: string }[] = [

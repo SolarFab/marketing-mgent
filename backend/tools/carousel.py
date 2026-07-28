@@ -271,7 +271,9 @@ def _wrap(text: str, width: int) -> list[str]:
 
 def carousel_dir(cycle_id: str, item_id: str) -> Path:
     root = Path(__file__).resolve().parent.parent.parent / "data" / "carousels"
-    d = root / cycle_id / item_id
+    d = (root / cycle_id / item_id).resolve()
+    if root.resolve() not in d.parents:
+        raise ValueError(f"carousel path escapes storage root: {cycle_id!r}/{item_id!r}")
     d.mkdir(parents=True, exist_ok=True)
     return d
 

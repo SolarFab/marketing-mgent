@@ -261,11 +261,13 @@ def extract_node(state: ContentState) -> dict:
     llm = make_llm(temperature=0.2)
     structured = llm.with_structured_output(CompanyProfileDraft)
     try:
-        draft: CompanyProfileDraft = structured.invoke(prompt)
+        draft: CompanyProfileDraft | None = structured.invoke(prompt)
+        if draft is None:  # model may emit no tool call → invoke() returns None
+            raise ValueError("structured output returned None")
     except Exception as e:
         log.warning("extract_node: structured output failed (%s); retrying raw JSON", e)
-        raw = llm.invoke(prompt).content
         try:
+            raw = llm.invoke(prompt).content
             data = json.loads(raw)
             draft = CompanyProfileDraft.model_validate(data)
         except Exception:

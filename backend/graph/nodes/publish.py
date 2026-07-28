@@ -66,7 +66,10 @@ def publish_node(state: ContentState) -> dict:
             _log(company_id, cycle_id, "linkedin", result)
 
     if cycle_id:
-        mem.finish_cycle(cycle_id, status="done")
+        # A cycle where every attempted channel errored is not "done".
+        attempted = [v for v in outcomes.values() if not v.get("skipped")]
+        all_failed = bool(attempted) and all(v.get("status") == "error" for v in attempted)
+        mem.finish_cycle(cycle_id, status="error" if all_failed else "done")
 
     log.info("publish_node: outcomes=%s", {k: v.get("status") for k, v in outcomes.items()})
     return {"publish": outcomes}

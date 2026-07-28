@@ -42,7 +42,7 @@ project-sprint3/
 │  ├─ api-reference.md       pointer to the auto-generated /docs OpenAPI page
 │  ├─ prompts/               every LLM prompt used, versioned
 │  └─ eval-runs/             one Markdown + JSON file per eval invocation
-├─ tests/                    pytest — 91 tests, ~1 min end-to-end
+├─ tests/                    pytest — 104 tests, ~3 min end-to-end
 ├─ .env / .env.example       API keys + config
 └─ pyproject.toml            pytest config
 ```
@@ -96,7 +96,7 @@ Open [`http://127.0.0.1:3000`](http://127.0.0.1:3000). First-run: go to the **On
 pytest -q
 ```
 
-The suite talks to a Neon `test` branch (isolated from your main data — see `tests/conftest.py`). ~91 tests, ~1 minute end-to-end.
+The suite talks to a Neon `test` branch (isolated from your main data — see `tests/conftest.py`). 104 tests, ~3 minutes end-to-end.
 
 ### 5. Run the eval
 
@@ -120,6 +120,13 @@ Four separations enforced in [`backend/graph/nodes/learning.py`](backend/graph/n
 4. **Confirm the rule, not just the item** — proposed rules land in `pending_rules`; the user confirms via the Profile · Learning tab; only then they hit `confirmed_rules`. The agent *proposes*, the user *disposes*.
 
 Same discipline for sources: hit-rate is a signal, not an axe. Under-performers are flagged; the agent never silently unfollows.
+
+## Known limitations
+
+Documented on purpose — these are design gaps, not oversights:
+
+- **Confirmed-rule matching is coarse.** A confirmed rule penalizes a candidate only when the rule's target phrase appears in the candidate's title/angle text ([`evaluate.py`](backend/graph/nodes/evaluate.py) `_pref_boost`). Mapping each reject reason code to a proper scoring signal (e.g. *off-brand* → pillar-fit weighting) is the natural next iteration.
+- **`content_history` is keyed by item id alone** ([`schema.sql`](backend/memory/schema.sql)), which is fine for the single-tenant deployment this targets but would collide across companies in a multi-tenant setup.
 
 ## Course requirements coverage
 

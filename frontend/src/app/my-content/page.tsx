@@ -50,6 +50,9 @@ export default function MyContentPage() {
   const [materializing, setMaterializing] = useState(false);
   const [buildImages, setBuildImages] = useState(false);
   const [result, setResult] = useState<MaterializeResult | null>(null);
+  // Cache-buster for generated images — refreshed only when a materialize
+  // run produces new images, so re-renders don't refetch every image.
+  const [imgBuster, setImgBuster] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     try {
@@ -99,12 +102,16 @@ export default function MyContentPage() {
 
   async function removeUpload(u: Upload) {
     if (!confirm(`Delete "${u.title || u.story.slice(0, 40)}"?`)) return;
-    await api.deleteUpload(u.upload_id);
-    if (openUpload?.upload_id === u.upload_id) {
-      setOpenUpload(null);
-      setResult(null);
+    try {
+      await api.deleteUpload(u.upload_id);
+      if (openUpload?.upload_id === u.upload_id) {
+        setOpenUpload(null);
+        setResult(null);
+      }
+      load();
+    } catch (e: any) {
+      setError(e.message || String(e));
     }
-    load();
   }
 
   async function materialize(u: Upload) {
@@ -115,6 +122,7 @@ export default function MyContentPage() {
     try {
       const r = await api.materializeUpload(u.upload_id, buildImages);
       setResult(r);
+      setImgBuster(Date.now());
     } catch (e: any) {
       setError(e.message || String(e));
     } finally {
@@ -300,6 +308,7 @@ export default function MyContentPage() {
                   slides={result.carousel_slides}
                   generated={result.generated_slides}
                   brand={brand}
+                  imgBuster={imgBuster}
                 />
               </ChannelCard>
 
@@ -428,11 +437,13 @@ function CarouselStrip({
   slides,
   generated,
   brand,
+  imgBuster,
 }: {
   heroUrl: string | null;
   slides: { role: string; big_text: string; subhead: string; image_prompt: string }[];
   generated: { index: number; url: string | null; role: string; error?: string }[];
   brand?: Brand;
+  imgBuster: number;
 }) {
   const generatedByIdx = new Map(generated.map((g) => [g.index, g]));
 
@@ -447,7 +458,7 @@ function CarouselStrip({
           {heroUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={`${BACKEND_URL}${heroUrl}?t=${Date.now()}`}
+              src={`${BACKEND_URL}${heroUrl}?t=${imgBuster}`}
               alt="hero"
               className="w-full h-full object-cover"
             />
@@ -474,7 +485,7 @@ function CarouselStrip({
               {g?.url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={`${BACKEND_URL}${g.url}?t=${Date.now()}`}
+                  src={`${BACKEND_URL}${g.url}?t=${imgBuster}`}
                   alt={s.role}
                   className="w-full h-full object-cover"
                 />

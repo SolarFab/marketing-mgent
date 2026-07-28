@@ -14,9 +14,8 @@ frontend/.env
 .DS_Store
 .claude/
 
-# Runtime artifacts
-data/brand-refs/*.png
-data/brand-refs/*.jpg
+# Runtime artifacts (generated carousels, uploads, brand refs)
+data/
 frontend/.next/
 frontend/out/
 frontend/tsconfig.tsbuildinfo

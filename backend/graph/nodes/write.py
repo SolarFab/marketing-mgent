@@ -166,9 +166,11 @@ def _write_newsletter(*, approved: list[dict], profile: dict, layout: str) -> di
     )
     llm = make_llm(temperature=0.5)
     try:
-        draft: NewsletterDraft = llm.with_structured_output(NewsletterDraft).invoke(prompt)
+        draft: NewsletterDraft | None = llm.with_structured_output(NewsletterDraft).invoke(prompt)
     except Exception as e:
         log.warning("_write_newsletter: structured output failed (%s)", e)
+        draft = None
+    if draft is None:  # model may emit no tool call → invoke() returns None
         draft = NewsletterDraft(layout=layout)
     d = draft.model_dump()
     d["layout"] = layout  # override in case model set it
@@ -184,10 +186,11 @@ def _write_social(*, approved: list[dict], profile: dict) -> SocialDrafts:
     )
     llm = make_llm(temperature=0.6)
     try:
-        return llm.with_structured_output(SocialDrafts).invoke(prompt)
+        drafts: SocialDrafts | None = llm.with_structured_output(SocialDrafts).invoke(prompt)
     except Exception as e:
         log.warning("_write_social: structured output failed (%s)", e)
-        return SocialDrafts()
+        drafts = None
+    return drafts if drafts is not None else SocialDrafts()
 
 
 def _compact_profile(profile: dict) -> dict:

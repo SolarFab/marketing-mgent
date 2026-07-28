@@ -180,7 +180,7 @@ def dismiss_proposed(source_id: str) -> None:
 
 def _host(url: str) -> str:
     try:
-        return urlparse(url).netloc.lower().lstrip("www.")
+        return urlparse(url).netloc.lower().removeprefix("www.")
     except Exception:
         return ""
 

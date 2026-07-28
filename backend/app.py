@@ -45,6 +45,9 @@ Every endpoint returns JSON. FastAPI auto-generates OpenAPI docs at
 """
 from __future__ import annotations
 
+import logging
+import re
+
 from typing import Any
 
 from pathlib import Path
@@ -105,6 +108,18 @@ app.mount("/user-uploads", StaticFiles(directory=str(_USER_UPLOADS_DIR)), name="
 
 
 # ---------- helpers ----------
+
+log = logging.getLogger(__name__)
+
+_SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _safe_id(value: str, label: str = "id") -> str:
+    """Reject ids that could escape their storage directory (path traversal)."""
+    if not _SAFE_ID_RE.match(value) or ".." in value:
+        raise HTTPException(status_code=400, detail=f"invalid {label}: {value!r}")
+    return value
+
 
 def _company_id(body_id: str | None = None) -> str:
     """Single-tenant: fall back to env default when not supplied."""
@@ -626,7 +641,7 @@ async def upload_content(
     """Persist the photo and metadata. Returns the row; frontend then calls
     ``/uploads/{id}/materialize`` to turn it into channel drafts.
     """
-    cid = _company_id(company_id)
+    cid = _safe_id(_company_id(company_id), "company_id")
     # Derive extension from the upload's content type or filename
     ext = "png"
     filename = (file.filename or "").lower()
@@ -697,7 +712,7 @@ def materialize_upload_endpoint(upload_id: str, req: MaterializeRequest) -> dict
     row = mem.get_upload(upload_id)
     if not row:
         raise HTTPException(status_code=404, detail=f"upload {upload_id} not found")
-    cid = _company_id(req.company_id) or row["company_id"]
+    cid = _company_id(req.company_id or row.get("company_id"))
     profile = mem.get_profile(cid) or {}
     if not profile:
         raise HTTPException(status_code=404, detail=f"no profile for company_id={cid}")
@@ -775,6 +790,8 @@ def carousel_plan(req: CarouselPlanRequest) -> dict:
     """Ask the LLM to plan the carousel. Persists the plan on disk so the
     frontend can edit inline and the /generate step can pick it up.
     """
+    _safe_id(req.cycle_id, "cycle_id")
+    _safe_id(req.item_id, "item_id")
     cid = _company_id(req.company_id)
     profile = mem.get_profile(cid) or {}
     if not profile:
@@ -812,7 +829,9 @@ def carousel_generate(req: CarouselGenerateRequest) -> dict:
     Returns URLs of the persisted PNGs relative to the backend
     (e.g. ``/carousels/{cycle}/{item}/0.png``).
     """
-    cid = _company_id(req.company_id)
+    _safe_id(req.cycle_id, "cycle_id")
+    _safe_id(req.item_id, "item_id")
+    cid = _safe_id(_company_id(req.company_id), "company_id")
     profile = mem.get_profile(cid) or {}
 
     # Merge: prefer client-supplied edited slides, else load persisted plan

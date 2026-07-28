@@ -74,10 +74,8 @@ def learning_node(state: ContentState) -> dict:
             mem.bump_source_counters(item["source_id"], approved=1)
 
     # 2. Reason histogram over the last LEARNING_WINDOW REJECTS.
-    recent = [
-        row for row in mem.recent_feedback(company_id, limit=s.learning_window * 3)
-        if row.get("decision") == "reject"
-    ][: s.learning_window]
+    # Filter in SQL so a run of approvals can't push rejects out of the window.
+    recent = mem.recent_feedback(company_id, limit=s.learning_window, decision="reject")
 
     hist = Counter(r["reason_code"] for r in recent if r.get("reason_code"))
 

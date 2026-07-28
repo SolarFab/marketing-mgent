@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, type Brand, type Profile } from "@/lib/api";
+import { api, BACKEND_URL, type Brand, type Profile } from "@/lib/api";
 
 type Msg =
   | { id: string; role: "agent" | "user"; text: string }
@@ -90,12 +90,15 @@ export default function OnboardPage() {
   async function runOnboard(url: string) {
     setPhase("reading");
     setBusy(true);
-    push({
-      id: newId(),
-      role: "agent",
-      text: `Reading ${new URL(url).hostname}… crawling homepage + high-signal pages and extracting your voice. This takes 20–40 seconds.`,
-    });
     try {
+      // Inside the try: an invalid-but-regex-matching URL would otherwise
+      // throw here and leave the page stuck busy.
+      const hostname = new URL(url).hostname;
+      push({
+        id: newId(),
+        role: "agent",
+        text: `Reading ${hostname}… crawling homepage + high-signal pages and extracting your voice. This takes 20–40 seconds.`,
+      });
       const r = await api.onboard(url);
       const p = r.company_profile;
       const props = r.proposed_sources || [];
@@ -361,9 +364,8 @@ function BrandCard({ brand }: { brand?: Brand }) {
     { label: "Tags", role: "category chips", hex: brand.category_tag_color || undefined },
   ].filter((s) => s.hex);
 
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8765";
   const refUrl = brand.reference_image_url
-    ? `${backendUrl}${brand.reference_image_url}?t=${Date.now()}`
+    ? `${BACKEND_URL}${brand.reference_image_url}?t=${Date.now()}`
     : null;
 
   return (

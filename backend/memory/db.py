@@ -99,7 +99,7 @@ def upsert_profile(company_id: str, profile: dict, crawled_urls: list[str] | Non
             json.dumps(profile.get("positioning") or {}),
             json.dumps(profile.get("voice") or {}),
             json.dumps(profile.get("content_pillars") or {}),
-            float(profile.get("content_mix", 0.5)),
+            0.5 if profile.get("content_mix") is None else float(profile["content_mix"]),
             json.dumps(profile.get("brand") or {}),
             json.dumps(crawled_urls) if crawled_urls is not None else None,
         ),
@@ -226,7 +226,12 @@ def log_feedback(
     )
 
 
-def recent_feedback(company_id: str, limit: int = 50) -> list[dict]:
+def recent_feedback(company_id: str, limit: int = 50, decision: str | None = None) -> list[dict]:
+    if decision:
+        return q(
+            "SELECT * FROM feedback_log WHERE company_id=%s AND decision=%s ORDER BY ts DESC LIMIT %s",
+            (company_id, decision, limit),
+        )
     return q(
         "SELECT * FROM feedback_log WHERE company_id=%s ORDER BY ts DESC LIMIT %s",
         (company_id, limit),
@@ -301,18 +306,20 @@ def save_drafts(cycle_id: str, company_id: str, drafts: dict, layout: str | None
         INSERT INTO drafts (cycle_id, company_id, newsletter, instagram, linkedin, layout, updated_at)
         VALUES (%s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, now())
         ON CONFLICT (cycle_id) DO UPDATE SET
-          newsletter = EXCLUDED.newsletter,
-          instagram  = EXCLUDED.instagram,
-          linkedin   = EXCLUDED.linkedin,
+          newsletter = COALESCE(EXCLUDED.newsletter, drafts.newsletter),
+          instagram  = COALESCE(EXCLUDED.instagram,  drafts.instagram),
+          linkedin   = COALESCE(EXCLUDED.linkedin,   drafts.linkedin),
           layout     = COALESCE(EXCLUDED.layout, drafts.layout),
           updated_at = now()
         """,
         (
             cycle_id,
             company_id,
-            json.dumps(drafts.get("newsletter")),
-            json.dumps(drafts.get("instagram")),
-            json.dumps(drafts.get("linkedin")),
+            # SQL NULL (not JSON null) for channels this call didn't produce,
+            # so a newsletter-only rewrite can't wipe existing social drafts.
+            json.dumps(drafts["newsletter"]) if drafts.get("newsletter") is not None else None,
+            json.dumps(drafts["instagram"]) if drafts.get("instagram") is not None else None,
+            json.dumps(drafts["linkedin"]) if drafts.get("linkedin") is not None else None,
             layout,
         ),
     )

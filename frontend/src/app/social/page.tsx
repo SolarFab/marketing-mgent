@@ -10,9 +10,7 @@
 // Both use the brand palette from your onboarding.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type Brand, type Candidate } from "@/lib/api";
-
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8765";
+import { api, BACKEND_URL, type Brand, type Candidate } from "@/lib/api";
 
 type SlidePlan = {
   role: string;
@@ -43,6 +41,9 @@ export default function SocialPage() {
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [planning, setPlanning] = useState(false);
   const [generating, setGenerating] = useState(false);
+  // Cache-buster for generated slide images — refreshed only when images
+  // are (re)generated, so re-renders don't refetch every image.
+  const [imgBuster, setImgBuster] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     try {
@@ -58,8 +59,8 @@ export default function SocialPage() {
       const d: any = draftsRes.drafts;
       if (d) {
         setDrafts(d);
-        setCycleId(d.cycle_id || saved || null);
       }
+      setCycleId(d?.cycle_id || saved || null);
       if (profile) setBrand(profile.brand);
       setCandidates((queue.candidates as Candidate[]) || []);
     } catch (e: any) {
@@ -95,6 +96,7 @@ export default function SocialPage() {
     try {
       const r = await api.carouselGenerate(cycleId, selectedStory.id, { slides: plan });
       setOutcomes(r.outcomes);
+      setImgBuster(Date.now());
     } catch (e: any) {
       setError(e.message || String(e));
     } finally {
@@ -116,6 +118,7 @@ export default function SocialPage() {
         r.outcomes.forEach((o) => map.set(o.index, o));
         return Array.from(map.values()).sort((a, b) => a.index - b.index);
       });
+      setImgBuster(Date.now());
     } catch (e: any) {
       setError(e.message || String(e));
     } finally {
@@ -260,6 +263,7 @@ export default function SocialPage() {
                   onRegenerate={regenerateSlide}
                   brand={brand}
                   generating={generating}
+                  imgBuster={imgBuster}
                 />
 
                 <div className="mt-4 flex items-center justify-between">
@@ -340,6 +344,7 @@ function SlidePlanReview({
   onRegenerate,
   brand,
   generating,
+  imgBuster,
 }: {
   plan: SlidePlan[];
   setPlan: (s: SlidePlan[]) => void;
@@ -347,6 +352,7 @@ function SlidePlanReview({
   onRegenerate: (index: number) => void;
   brand?: Brand;
   generating: boolean;
+  imgBuster: number;
 }) {
   const outcomeByIdx = new Map(outcomes.map((o) => [o.index, o]));
 
@@ -381,7 +387,7 @@ function SlidePlanReview({
             <div className="relative aspect-[4/5] bg-neutral-200">
               {url ? (
                 <img
-                  src={`${BACKEND}${url}?t=${Date.now()}`}
+                  src={`${BACKEND_URL}${url}?t=${imgBuster}`}
                   alt={s.role}
                   className="w-full h-full object-cover"
                 />
